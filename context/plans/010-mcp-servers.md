@@ -36,7 +36,7 @@ An **MCP servers** section where you add MCP servers once and pick which agents 
 - No sandbox network rules are needed for gateway traffic.
 - Loaded servers survive Stop and Start; loading twice is harmless. Unknown server or a stopped sandbox → a clear error.
 - A server that needs sign-in still loads, but only exposes an authorize tool until `sbx mcp auth`.
-- There is no per-sandbox unload, and `sbx mcp ls` has no per-sandbox view locally, so HQ records what it attached (`~/.jsmhq/<project>/mcp-attached.json`) and unticking applies on recreate.
+- There is no per-sandbox unload, and `sbx mcp ls` has no per-sandbox view locally, so HQ records what it attached (`~/.hrhq/<project>/mcp-attached.json`) and unticking applies on recreate.
 - API keys: `--header 'Authorization: Bearer ${token}'` plus `sbx secret set mcp:<name>:token`. sbx also stores `mcp:<name>:token:endpoint`; both are removed with the server.
 
 ### Was "to verify while building"

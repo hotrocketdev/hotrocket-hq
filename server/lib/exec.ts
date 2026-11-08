@@ -1,4 +1,7 @@
 import { execFile } from "node:child_process";
+import { existsSync } from "node:fs";
+import { homedir } from "node:os";
+import { delimiter, join } from "node:path";
 
 export interface RunResult {
   ok: boolean;
@@ -32,4 +35,27 @@ export async function has(cmd: string): Promise<boolean> {
 /** Quotes a value for a POSIX shell command line. */
 export function shq(s: string): string {
   return `'${s.replace(/'/g, `'\\''`)}'`;
+}
+
+/**
+ * Launchers (GUI apps, some shells, service wrappers) often start HQ with a PATH
+ * that is missing the folders CLI tools are installed into — npm's global bin,
+ * ~/.local/bin, Homebrew on Apple silicon, Docker Sandboxes on Windows. `where`
+ * and `command -v` then report a working tool as "not installed", so the setup
+ * checklist lies. Add those folders to this process's PATH once, at startup.
+ */
+export function augmentPath(): void {
+  const home = homedir();
+  const extra =
+    process.platform === "win32"
+      ? [
+          join(home, ".local", "bin"),
+          join(process.env.LOCALAPPDATA ?? join(home, "AppData", "Local"), "DockerSandboxes", "bin"),
+          join(process.env.APPDATA ?? join(home, "AppData", "Roaming"), "npm"),
+          join(process.env.ProgramFiles ?? "C:\\Program Files", "nodejs"),
+        ]
+      : [join(home, ".local", "bin"), "/opt/homebrew/bin", "/usr/local/bin", join(home, "bin")];
+  const current = (process.env.PATH ?? "").split(delimiter).filter(Boolean);
+  const missing = extra.filter((dir) => existsSync(dir) && !current.includes(dir));
+  if (missing.length) process.env.PATH = [...missing, ...current].join(delimiter);
 }

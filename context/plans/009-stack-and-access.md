@@ -23,7 +23,7 @@ Plus **access requests**: when an agent's sandbox blocks a domain, the agent ask
   - a one-line ROLE.md note.
 
   Adding a tool means adding an entry, not code. 3–4 researched options per category to start.
-- **Saved in `.jsmhq/config.json`** (`stack`), so the whole team shares it.
+- **Saved in `.hrhq/config.json`** (`stack`), so the whole team shares it.
 - **Network access is never added silently.**
   - Choosing a tool shows its domains with checkboxes. You confirm, and they're added to each agent's per-sandbox allow list (the existing Settings → Sandbox rules, removable, HQ-owned).
   - The base policy is never touched.
@@ -49,7 +49,7 @@ Plus **access requests**: when an agent's sandbox blocks a domain, the agent ask
 | Security | Arcjet, Upstash Ratelimit, Other |
 
 ### Verified
-- Skills: `npx skills add <source> --skill <names…> -a claude-code codex -y --copy` installs project-level, non-interactively, into `.claude/skills/` (Claude Code) and `.agents/skills/` (Codex), plus a `skills-lock.json`. HQ installs once per project into `~/.jsmhq/<project>/skills-cache` and copies into each agent's folder (git-excluded; skills the repo already commits are left alone). Measured: 17 skills for Next.js + Express + Clerk + Clerk Billing + InstaCloud + PostHog + Arcjet in 41s the first time, 0.4s after that.
+- Skills: `npx skills add <source> --skill <names…> -a claude-code codex -y --copy` installs project-level, non-interactively, into `.claude/skills/` (Claude Code) and `.agents/skills/` (Codex), plus a `skills-lock.json`. HQ installs once per project into `~/.hrhq/<project>/skills-cache` and copies into each agent's folder (git-excluded; skills the repo already commits are left alone). Measured: 17 skills for Next.js + Express + Clerk + Clerk Billing + InstaCloud + PostHog + Arcjet in 41s the first time, 0.4s after that.
 - Catalog sources and skill names were listed with `npx skills add <source> -l` (clerk/skills, PostHog/skills, arcjet/skills, InsForge/instacloud-skills, stripe/ai, vercel/next.js, vercel-labs/agent-skills).
 - A sandbox block is an HTTP 403 from sbx's proxy with the body "Approval required for <host>:443. Review and respond with: sbx policy approval ls". Live test: a real Claude agent hit it, called request_access with the 403 text as its reason, Allow added a per-sandbox rule, and its retry worked without a restart.
 - Follow-up idea: sbx queues every blocked request per sandbox (`sbx policy approval ls` / `respond`). HQ could surface those automatically, even when an agent doesn't call request_access.

@@ -16,18 +16,20 @@ import { resolveCommand } from "./backends/pty";
 import { loadEnvFile } from "./backends/tmux";
 import { sandboxList } from "./lib/json";
 import { run } from "./lib/exec";
+import { readScreen } from "./screenState";
 import { log } from "./lib/log";
 import { projectHome, sessionName } from "./paths";
 import { POLICY_NOT_INITIALIZED, policyVerdict, runSetupChecks } from "./setup";
 import { ensureWorkspace, workspaceFor } from "./workspace";
 
-const TERM_ENV = { ...process.env, TERM: "xterm-256color", COLORTERM: "truecolor" } as Record<string, string>;
+// Read at spawn time, so a PATH fixed at startup (see lib/exec augmentPath) is included.
+const termEnv = (): Record<string, string> => ({ ...process.env, TERM: "xterm-256color", COLORTERM: "truecolor" });
 /**
  * Shells you type in (Shell tab, Terminal panel): CLIs print links as real links (OSC 8), so a long
  * URL stays one clickable link instead of being cut across lines. Not for agent sessions: tmux
  * drops OSC 8 links unless the outer terminal declares support, which would hide the URL.
  */
-const SHELL_ENV = { ...TERM_ENV, FORCE_HYPERLINK: "1" };
+const shellEnv = (): Record<string, string> => ({ ...termEnv(), FORCE_HYPERLINK: "1" });
 /**
  * sbx's opener inside a sandbox: sends the URL to this machine's browser. npm's `open` package
  * (used by many CLIs) ignores xdg-open on PATH and only uses it when BROWSER says so.
@@ -35,14 +37,12 @@ const SHELL_ENV = { ...TERM_ENV, FORCE_HYPERLINK: "1" };
 const SANDBOX_BROWSER = "/usr/local/bin/xdg-open";
 
 // What the agents' screens show (Claude Code and Codex).
-const BUSY = /esc to interrupt/i; // the footer while a turn runs
-// A question or permission prompt (Claude Code's wording; the numbered-option line also covers Codex's).
-const DIALOG = /Enter to select|↑\/↓ to navigate|Do you want to (proceed|make this edit|create)|Would you like to|^\s*[❯›]\s*1\.\s/im;
-const PROMPT_READY = /⏵⏵|\? for shortcuts|Ask Codex to do anything/; // the input prompt is up
+// First-run "do you trust this folder" screens: HQ never answers one for you, it says so on the card.
+const TRUST_NOTE = "Asking: choose \u201cYes, I trust this folder\u201d in its terminal";
 const SCREEN_QUIET_MS = 4000; // only second-guess hooks after this much silence
 const STALE_WORKING_MS = 15_000; // "working" with an idle screen this long = a missed Stop
 
-/** Starts bash (else sh) in a sandbox, with links and browser opening set up (see SHELL_ENV, SANDBOX_BROWSER). */
+/** Starts bash (else sh) in a sandbox, with links and browser opening set up (see shellEnv, SANDBOX_BROWSER). */
 const SANDBOX_SHELL = `export FORCE_HYPERLINK=1; [ -x ${SANDBOX_BROWSER} ] && export BROWSER=${SANDBOX_BROWSER}; command -v bash >/dev/null && exec bash -l || exec sh -l`;
 
 export class Sessions {
@@ -461,23 +461,28 @@ export class Sessions {
     if (quietMs < SCREEN_QUIET_MS) return;
     const screen = await this.backend.screenText(name, 10);
     if (!screen) return;
-    const busy = BUSY.test(screen);
-    const dialog = DIALOG.test(screen);
+    const { busy, dialog, trust, promptReady } = readScreen(screen);
     const set = (state: "idle" | "working" | "needs-input", note: string) => {
-      if (process.env.HQ_DEBUG) log.info(`screen ${agentId}: ${st.state} → ${state} (${note})`);
+      if (process.env.HQ_DEBUG) log.info(`screen ${agentId}: ${st.state} -> ${state} (${note})`);
+      const wasAsking = st.state === "needs-input" && st.note === note;
       this.hub.setStatus(agentId, { state, note });
+      if (state === "needs-input" && !wasAsking) {
+        this.hub.activity("agent.needs-input", agentId, `${this.hub.name(agentId)} needs you: ${note.replace(/^Asking:\s*/, "")}`);
+      }
     };
 
     if (st.state === "needs-input") {
       if (dialog || st.note?.includes("Codex's folder")) return; // still waiting (Codex trust is watched separately)
       this.idleScreens.delete(agentId);
       if (busy) return set("working", "Continuing after your answer");
+      // The trust screen we were waiting on is gone, so the user answered it — even before any hook fires.
+      if (st.note === TRUST_NOTE) return set("idle", "Waiting for you");
       // Idle only on a positive sign: Claude Code's normal input footer is back. An unfamiliar
       // prompt keeps "needs you", so queued messages aren't typed into it. Codex: wait for "busy".
-      if (cli === "claude" && PROMPT_READY.test(screen)) set("idle", "Waiting for you");
+      if (cli === "claude" && promptReady) set("idle", "Waiting for you");
       return;
     }
-    if (dialog) return set("needs-input", "Asking: answer the question in the terminal");
+    if (dialog) return set("needs-input", trust ? TRUST_NOTE : "Asking: answer the question in the terminal");
     // A missed UserPromptSubmit: the agent is busy, so don't type into it.
     if (st.state === "idle" && busy) return set("working", "Working");
     if (st.state === "working" && !busy && cli === "claude") {
@@ -492,7 +497,7 @@ export class Sessions {
     }
     this.idleScreens.delete(agentId);
     // An idle agent's prompt is on screen, so typed messages will land (e.g. HQ missed SessionStart).
-    if (st.state === "idle" && !busy && PROMPT_READY.test(screen)) this.onSessionReattached(agentId);
+    if (st.state === "idle" && !busy && promptReady) this.onSessionReattached(agentId);
   }
 
   // ------------------------------------------------------------ setup helper
@@ -505,7 +510,7 @@ export class Sessions {
   runTerminal(id: string, file: string, args: string[], onExit: (code: number) => void = () => {}) {
     if (!id.startsWith("setup:") || this.fixes.has(id)) return;
     const size = this.sizes.get(id) ?? { cols: 100, rows: 16 };
-    const pty = spawnPty(file, args, { name: "xterm-256color", cols: size.cols, rows: size.rows, cwd: this.hub.repo.root, env: TERM_ENV });
+    const pty = spawnPty(file, args, { name: "xterm-256color", cols: size.cols, rows: size.rows, cwd: this.hub.repo.root, env: termEnv() });
     this.fixes.set(id, pty);
     this.hub.terminal(id, `\x1b[2m$ ${[file, ...args].join(" ")}\x1b[0m\r\n`);
     pty.onData((d) => this.hub.terminal(id, d));
@@ -525,7 +530,7 @@ export class Sessions {
     const shell = process.platform === "win32" ? "powershell.exe" : process.env.SHELL || "/bin/sh";
     const args = process.platform === "win32" ? ["-NoProfile", "-Command", check.fix.command] : ["-lc", check.fix.command];
     const size = this.sizes.get(id) ?? { cols: 100, rows: 16 };
-    const pty = spawnPty(shell, args, { name: "xterm-256color", cols: size.cols, rows: size.rows, cwd: this.hub.repo.root, env: TERM_ENV });
+    const pty = spawnPty(shell, args, { name: "xterm-256color", cols: size.cols, rows: size.rows, cwd: this.hub.repo.root, env: termEnv() });
     this.fixes.set(id, pty);
     this.hub.terminal(id, `\x1b[2m$ ${check.fix.command}\x1b[0m\r\n`);
     pty.onData((d) => this.hub.terminal(id, d));
@@ -576,7 +581,7 @@ export class Sessions {
       }
       if (this.shellGen.get(id) !== gen || this.shells.has(id) || this.hub.status(agentId)?.session.state !== "running") return;
       const size = this.sizes.get(id) ?? { cols: 100, rows: 30 };
-      pty = spawnPty(file, args, { name: "xterm-256color", cols: size.cols, rows: size.rows, cwd: dir, env: SHELL_ENV });
+      pty = spawnPty(file, args, { name: "xterm-256color", cols: size.cols, rows: size.rows, cwd: dir, env: shellEnv() });
     } catch (err) {
       // e.g. sbx not on PATH: show it in the Shell tab instead of failing silently.
       return this.hub.terminal(id, `\x1b[31mCouldn't open a shell: ${err instanceof Error ? err.message : String(err)}\x1b[0m\r\n`);
@@ -622,7 +627,7 @@ export class Sessions {
     const size = this.sizes.get(id) ?? { cols: 100, rows: 30 };
     let pty: IPty;
     try {
-      pty = spawnPty(sh, win ? ["-NoLogo"] : ["-l"], { name: "xterm-256color", cols: size.cols, rows: size.rows, cwd: want, env: SHELL_ENV });
+      pty = spawnPty(sh, win ? ["-NoLogo"] : ["-l"], { name: "xterm-256color", cols: size.cols, rows: size.rows, cwd: want, env: shellEnv() });
     } catch (err) {
       return this.hub.terminal(id, `\x1b[31mCouldn't open a shell: ${err instanceof Error ? err.message : String(err)}\x1b[0m\r\n`);
     }

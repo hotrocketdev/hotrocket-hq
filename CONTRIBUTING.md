@@ -1,11 +1,11 @@
-# Contributing to JSM HQ
+# Contributing to HotRocket HQ
 
 ## Run it from source
 
 Needs Node.js 20+ and pnpm 10 or 11 (`corepack enable` gets you pnpm).
 
 ```bash
-git clone https://github.com/jsmastery-pro/jsm-hq && cd jsm-hq
+git clone https://github.com/hotrocketdev/hotrocket-hq && cd hotrocket-hq
 pnpm install
 pnpm dev                                   # the UI with fake data, no agents
 HQ_REPO=~/developer/hq-test pnpm dev:hq    # the real HQ server + UI, with hot reload
@@ -33,18 +33,18 @@ src/
   office/    The PixiJS pixel office: layout, sprites, agents, belt
   ui/        Top bar, team panel, activity, drawers, settings, setup checklist, welcome
 server/      Local HQ server: setup checks, workspaces, sessions (tmux, or HQ-run on Windows), sbx, hooks, Team MCP, GitHub
-bin/         The jsm-hq command
-docs/        User guides, and the product spec (jsmhq-context.md)
+bin/         The hotrocket-hq command
+docs/        User guides, and the product spec (product-spec.md)
 context/     Implementation plans
 ```
 
 ## Docker Sandboxes versions
 
-HQ calls the `sbx` CLI and reads its output. sbx 0.48 changed several outputs (for example `sbx ls --json` and `sbx mcp ls --json` now return a bare array), so read sbx output in a way that accepts both the old and the new format. HQ is tested on sbx 0.47 and 0.50.
+HQ calls the `sbx` CLI and reads its output. sbx 0.48 changed several outputs (for example `sbx ls --json` and `sbx mcp ls --json` now return a bare array), so read sbx output in a way that accepts both the old and the new format. HQ is tested on sbx 0.47, 0.50 and 0.51.
 
 ## Releasing
 
 1. Bump `version` in `package.json` and merge to `main`.
 2. From a clean, up-to-date `main`, run `npm publish`. It builds first.
 
-Only members of the `therealjsmastery` npm org can publish. The README on npm updates only when a new version is published.
+Publishing needs write access to the `hotrocket-hq` package on npm (Hot Rocket Software's npm account). The README on npm updates only when a new version is published.

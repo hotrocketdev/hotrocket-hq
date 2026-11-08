@@ -10,7 +10,7 @@ HQ reads the project's PRs from GitHub through your `gh` login (read-only), matc
 - **Human review:** GitHub's review decision, or the latest approving / changes-requested review.
 - **Automations:** changes requested → the author is told to fix the comments; passed → the lead is told it's ready to merge; merged → the task is done and the lead is told; merge conflict → the author is told to rebase.
 - **Read-only:** "Open on GitHub" link; if the workflow says the lead merges, the lead runs `gh pr merge` itself.
-- **Repo:** taken from the repo's `origin` remote. Real-world data from jsmastery-pro/askwell confirmed: CodeRabbit posts COMMENTED reviews and a `CodeRabbit` commit status ("Review completed", "Review rate limited").
+- **Repo:** taken from the repo's `origin` remote. Real-world data from hotrocket/askwell confirmed: CodeRabbit posts COMMENTED reviews and a `CodeRabbit` commit status ("Review completed", "Review rate limited").
 
 ### How to build it
 1. `server/github.ts`: GraphQL query (open PRs + latest merged) and parser → `PullRequest` (with URL and branch).

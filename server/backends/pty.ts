@@ -10,7 +10,8 @@ import type { ExitInfo, SessionBackend, TermSize } from "./types";
 
 const { Terminal } = xtermHeadless;
 
-const TERM_ENV = { ...process.env, TERM: "xterm-256color", COLORTERM: "truecolor" } as Record<string, string>;
+// Read at spawn time, so a PATH fixed at startup (see lib/exec augmentPath) is included.
+const termEnv = (): Record<string, string> => ({ ...process.env, TERM: "xterm-256color", COLORTERM: "truecolor" });
 
 interface Proc {
   pty: IPty;
@@ -49,7 +50,7 @@ export const ptyBackend: SessionBackend = {
     if (procs.has(name)) return;
     // There's no shell to load an env file into (sandbox mode passes it to sbx instead).
     const { file, args } = await resolveCommand(spec.file, spec.args);
-    const pty = spawnPty(file, args, { name: "xterm-256color", cols: size.cols, rows: size.rows, cwd, env: TERM_ENV });
+    const pty = spawnPty(file, args, { name: "xterm-256color", cols: size.cols, rows: size.rows, cwd, env: termEnv() });
     const screen = new Terminal({ cols: size.cols, rows: size.rows, scrollback: 300, allowProposedApi: true });
     const proc: Proc = { pty, screen, exit: { dead: false, exitStatus: null }, views: new Set(), ends: new Set() };
     pty.onData((d) => {
