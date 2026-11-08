@@ -1,12 +1,12 @@
-# JSM HQ
+# HotRocket HQ
 
 **Run a team of AI coding agents on your repo, and watch them work in a pixel-art office.**
 
-[![npm](https://img.shields.io/npm/v/@therealjsmastery/jsm-hq?color=cb3837&label=npm)](https://www.npmjs.com/package/@therealjsmastery/jsm-hq)
-[![license](https://img.shields.io/npm/l/@therealjsmastery/jsm-hq)](LICENSE)
-[![node](https://img.shields.io/node/v/@therealjsmastery/jsm-hq)](https://nodejs.org)
+[![npm](https://img.shields.io/npm/v/hotrocket-hq?color=cb3837&label=npm)](https://www.npmjs.com/package/hotrocket-hq)
+[![license](https://img.shields.io/npm/l/hotrocket-hq)](LICENSE)
+[![node](https://img.shields.io/node/v/hotrocket-hq)](https://nodejs.org)
 
-![The JSM HQ office: a lead and two developers at their desks, the task board on the wall, pull requests on the board and the review gate on the belt](docs/images/office.png)
+> Forked from [JSM HQ](https://github.com/jsmastery-pro/jsm-hq) by JavaScript Mastery (MIT). This is Hot Rocket Software's own version of it; see [TRADEMARKS.md](TRADEMARKS.md) for what the licence does and doesn't cover.
 
 One **lead** agent plans the work and hands out tasks. Each **worker** gets its own desk, its own copy of your repo and its own Docker Sandbox, then opens a pull request. You see it all happen: the plan on the wall, agents at their desks, PRs moving through review.
 
@@ -25,7 +25,7 @@ Agents run **Claude Code** or **Codex**. Everything runs on your machine.
 From inside a git repo that has a GitHub remote:
 
 ```bash
-npx @therealjsmastery/jsm-hq@latest
+npx hotrocket-hq@latest
 ```
 
 HQ opens in your browser and walks you through the rest:
@@ -41,19 +41,19 @@ HQ opens in your browser and walks you through the rest:
 ```bash
 mkdir hq-test && cd hq-test
 git init -b main && echo "# HQ test" > README.md && git add . && git commit -m init
-npx @therealjsmastery/jsm-hq@latest
+npx hotrocket-hq@latest
 ```
 
 ### Options
 
 ```
-jsm-hq --repo <path>   the repo to manage (default: current folder)
+hotrocket-hq --repo <path>   the repo to manage (default: current folder)
        --port <n>      HQ port (default: 7420)
        --no-open       don't open the browser
        --version, --help
 ```
 
-Use it often? `npm install -g @therealjsmastery/jsm-hq`, then run `jsm-hq` in any repo.
+Use it often? `npm install -g hotrocket-hq`, then run `hotrocket-hq` in any repo.
 
 ## Requirements
 
@@ -72,8 +72,6 @@ You don't need to install these by hand first. HQ checks for each one and shows 
 
 ## How it works
 
-![An agent's drawer: its live terminal, its sandbox, websites it tried to reach, and tabs for its task and messages](docs/images/agent-drawer.png)
-
 1. **You tell the lead what to build.** It creates a board of small tasks, each with the files it may touch, and assigns them.
 2. **Workers build in their own sandboxes.** Each one pulls `main`, makes a branch, writes the code and opens a PR titled `[TASK-ID] …`.
 3. **HQ follows the PRs on GitHub.** Review comments go back to the author; a passing PR is reported to the lead; a merged PR marks the task done.
@@ -88,18 +86,18 @@ More detail on workspaces, sandboxes, MCP servers, app variables and what HQ sav
 
 | Problem | Fix |
 | --- | --- |
-| A setup check shows "!" but the tool works | You may be on an old HQ. Run `npx @therealjsmastery/jsm-hq@latest` (npx can keep an old version cached). |
+| A setup check shows "!" but the tool works | You may be on an old HQ. Run `npx hotrocket-hq@latest` (npx can keep an old version cached). |
 | Start fails: "network policy has not been initialized" | A new Docker Sandboxes install needs a base policy once: `sbx policy init balanced`. |
 | Agents fail to start with a sign-in error | Your Docker sign-in expired. Run `sbx login`, then **Check again** in the setup checklist. |
 | Agents can't push or open PRs | Run `sbx secret set github --command "gh auth token"`, and check the repo has a GitHub `origin`. |
-| A Codex agent waits on "Do you trust this folder?" | Answer it once in the agent's terminal. HQ never answers trust prompts for you. |
+| An agent's first start stops on "Security guide — do you trust this folder?" (Claude Code) or "Do you trust the contents of this directory?" (Codex) | Choose **Yes** in the agent's terminal, once per folder. The agent shows **Needs you** and an Action item while it waits; HQ never answers a trust prompt for you. |
 | A CLI sign-in in a sandbox opens the browser, then fails on `localhost:<port>` | Press **Forward port** in the agent's drawer, then reload the page. |
 | An agent's state never changes | The sandbox can't reach HQ. `sbx policy ls` should show `localhost:<port>` and `host.docker.internal:<port>` allowed; HQ adds them on start. |
 | "Port 7420 is in use" | Another HQ is running. Stop it, or use `--port 7421`. |
 | Windows: `listen EACCES` on start | Windows reserved that port. Use `--port 8420`. |
-| `posix_spawnp failed` when opening a terminal | Run `npx clear-npx-cache`, then `npx @therealjsmastery/jsm-hq@latest`. |
+| `posix_spawnp failed` when opening a terminal | Run `npx clear-npx-cache`, then `npx hotrocket-hq@latest`. |
 
-**Remove a project:** delete each agent in Settings → Team (this removes its sandbox and, if you choose, its folder), then delete `~/.jsmhq/<project>`.
+**Remove a project:** delete each agent in Settings → Team (this removes its sandbox and, if you choose, its folder), then delete `~/.hrhq/<project>`.
 
 ## Docs
 
@@ -110,4 +108,4 @@ More detail on workspaces, sandboxes, MCP servers, app variables and what HQ sav
 
 ## License
 
-Code: [MIT](LICENSE). The JSM HQ name and logo are not covered by the license; see [TRADEMARKS.md](TRADEMARKS.md).
+Code: [MIT](LICENSE). The HotRocket HQ name and logo are not covered by the license; see [TRADEMARKS.md](TRADEMARKS.md).

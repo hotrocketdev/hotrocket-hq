@@ -1,6 +1,6 @@
-// jsm-hq — start HQ for the git repo you're in.
+// hotrocket-hq — start HQ for the git repo you're in.
 //
-//   jsm-hq [--repo <path>] [--port 7420] [--dev] [--no-open]
+//   hotrocket-hq [--repo <path>] [--port 7420] [--dev] [--no-open]
 //
 // --dev: the UI is served by Vite (pnpm dev:hq); HQ prints/opens the Vite URL.
 
@@ -16,7 +16,7 @@ import { Planner } from "./planner";
 import { ActionItems } from "./actionItems";
 import { Sbx } from "./sbx";
 import { SbxMcp } from "./sbxMcp";
-import { run } from "./lib/exec";
+import { augmentPath, run } from "./lib/exec";
 import { log } from "./lib/log";
 import { ensurePtyHelperExecutable } from "./lib/ptyFix";
 import { agentToken, browserToken } from "./paths";
@@ -32,6 +32,8 @@ function arg(name: string): string | undefined {
 const flag = (name: string) => process.argv.includes(`--${name}`);
 
 async function main() {
+  // Before any check or spawn: a launcher's PATH may be missing where the CLIs live.
+  augmentPath();
   ensurePtyHelperExecutable();
   const dev = flag("dev");
   const port = Number(arg("port") ?? process.env.HQ_PORT ?? 7420);
@@ -98,7 +100,7 @@ async function main() {
   github.start();
 
   const url = `${uiOrigin}/?token=${uiToken}`;
-  log.info(`\n\n  JSM HQ is running → ${url}\n`);
+  log.info(`\n\n  HotRocket HQ is running → ${url}\n`);
   if (!flag("no-open")) {
     // Windows: rundll32 hands the URL to the default browser without a shell (the token has no special chars, but `&` would).
     const [opener, args] = process.platform === "darwin" ? ["open", [url]] : process.platform === "win32" ? ["rundll32", ["url.dll,FileProtocolHandler", url]] : ["xdg-open", [url]];
@@ -119,15 +121,15 @@ async function main() {
 
 main().catch((err) => {
   if ((err as NodeJS.ErrnoException)?.code === "EADDRINUSE") {
-    log.error(`Port ${arg("port") ?? 7420} is in use — another HQ may be running. Stop it, or pick another port: npx @therealjsmastery/jsm-hq --port 7421`);
+    log.error(`Port ${arg("port") ?? 7420} is in use — another HQ may be running. Stop it, or pick another port: npx hotrocket-hq --port 7421`);
     process.exit(1);
   }
   if ((err as NodeJS.ErrnoException)?.code === "EACCES") {
     const port = arg("port") ?? 7420;
     log.error(
       process.platform === "win32"
-        ? `Windows reserved port ${port} (Hyper-V, WSL and Docker reserve port ranges). Pick another: npx @therealjsmastery/jsm-hq --port 8420\n  See the reserved ranges with: netsh interface ipv4 show excludedportrange protocol=tcp`
-        : `Not allowed to use port ${port}. Pick another: npx @therealjsmastery/jsm-hq --port 8420`,
+        ? `Windows reserved port ${port} (Hyper-V, WSL and Docker reserve port ranges). Pick another: npx hotrocket-hq --port 8420\n  See the reserved ranges with: netsh interface ipv4 show excludedportrange protocol=tcp`
+        : `Not allowed to use port ${port}. Pick another: npx hotrocket-hq --port 8420`,
     );
     process.exit(1);
   }

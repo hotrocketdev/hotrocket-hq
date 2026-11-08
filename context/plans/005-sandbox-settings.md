@@ -5,10 +5,10 @@ Settings → Sandbox applies settings for real through `sbx` and shows what is i
 
 ### Decisions
 - **Base policy level:** machine-wide in sbx (`sbx policy init`; changing it means `reset`, which wipes every rule). HQ detects and shows it read-only, with the command and a docs link.
-- **Allowed / blocked domains (per agent):** synced to `sbx policy allow/deny network --sandbox <name>`. HQ adds missing rules and removes only rules it added (tracked in `~/.jsmhq/<project>/sbx-owned.json`, removed by rule id). Kit, org and user CLI rules are never touched. Applied after the sandbox exists and on every change.
+- **Allowed / blocked domains (per agent):** synced to `sbx policy allow/deny network --sandbox <name>`. HQ adds missing rules and removes only rules it added (tracked in `~/.hrhq/<project>/sbx-owned.json`, removed by rule id). Kit, org and user CLI rules are never touched. Applied after the sandbox exists and on every change.
 - **Service keys** (`github`, `anthropic`, `openai`, …): global or for one agent's sandbox. The value goes to `sbx secret set` via stdin; HQ never stores it. The list shows what `sbx secret ls --json` reports. Agent-scoped keys need the sandbox to exist.
 - **Proxy:** under This machine (`sbx settings set/unset proxy.sandbox`), labelled as affecting all sandboxes.
-- **App variables:** a per-agent env file `~/.jsmhq/<project>/<agent>.env` (0600), never read or committed by HQ, passed with `--env-file` (Sandbox) or sourced (Local). The UI says these values do enter the VM.
+- **App variables:** a per-agent env file `~/.hrhq/<project>/<agent>.env` (0600), never read or committed by HQ, passed with `--env-file` (Sandbox) or sourced (Local). The UI says these values do enter the VM.
 - **Removed from the data model:** per-agent policy level, per-agent proxy, free-form secret names.
 
 ### How to build it

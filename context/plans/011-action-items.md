@@ -12,7 +12,7 @@ One list of everything waiting on you. Agents ask you to do things outside their
 - **You close an item:**
   - **Done**, with an optional note: HQ messages the agent "The user did: <title>. Note: …", and it continues.
   - **Dismiss**: HQ tells the agent to continue without it.
-- **Stored on your Mac** in `~/.jsmhq/<project>/action-items.json`, so it survives restarts and is never committed.
+- **Stored on your Mac** in `~/.hrhq/<project>/action-items.json`, so it survives restarts and is never committed.
 - **Also waiting on you** (read-only, each with an Open link), shown in the same list:
   - agents asking a question in their terminal (red "Needs input");
   - access requests;

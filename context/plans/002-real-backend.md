@@ -1,14 +1,14 @@
-## Implementation plan: real JSM HQ backend
+## Implementation plan: real HotRocket HQ backend
 
 ### What we're building
-A local HQ server that replaces the mock data source. You run `npx jsm-hq` inside your repo. It checks the tools it needs, creates a folder per agent (an HQ-managed clone with that agent's `ROLE.md`, hooks and MCP config), starts each agent in its own Docker Sandbox (or in Local mode) inside a tmux session, and streams the real Claude Code terminals to the UI we already built. Agents report their state through Claude Code hooks and talk to each other through HQ's Team MCP. HQ owns the plan, reads PRs and reviews through `gh`, and nudges agents when a review comes back. Every UI change goes through `OfficeDataSource`, so the office and drawers stay as they are.
+A local HQ server that replaces the mock data source. You run `npx hotrocket-hq` inside your repo. It checks the tools it needs, creates a folder per agent (an HQ-managed clone with that agent's `ROLE.md`, hooks and MCP config), starts each agent in its own Docker Sandbox (or in Local mode) inside a tmux session, and streams the real Claude Code terminals to the UI we already built. Agents report their state through Claude Code hooks and talk to each other through HQ's Team MCP. HQ owns the plan, reads PRs and reviews through `gh`, and nudges agents when a review comes back. Every UI change goes through `OfficeDataSource`, so the office and drawers stay as they are.
 
 ### Terms we agreed on
-- **Workspace:** an agent's folder, by default an HQ-managed full clone at `~/.jsmhq/<project>/<agent>/`. It can be pointed at an existing folder instead. Clone mode (`sbx --clone`) is a later option.
+- **Workspace:** an agent's folder, by default an HQ-managed full clone at `~/.hrhq/<project>/<agent>/`. It can be pointed at an existing folder instead. Clone mode (`sbx --clone`) is a later option.
 - **Agent files:** `ROLE.md`, `.claude/settings.local.json` (hooks) and `.mcp.json` (Team MCP with the agent's id and token). HQ writes them and lists them in `.git/info/exclude` so they're never committed.
 - **Session:** the tmux session `hq-<agent>` that runs the agent. It survives HQ or browser restarts.
 - **Agent mode:** Sandbox (`sbx run … claude <folder>`) or Local (`claude` in the same folder, permission prompts on).
-- **Plan store:** HQ-owned boards and tasks in `.jsmhq/plan.json`. The lead changes them only through MCP tools.
+- **Plan store:** HQ-owned boards and tasks in `.hrhq/plan.json`. The lead changes them only through MCP tools.
 - **Delivery:** HQ passes a message or command to an agent by typing it into the agent's terminal once the agent is idle. While the agent is busy, the message waits in a queue.
 - **Setup checklist:** the screen shown when a required tool is missing.
 
@@ -39,10 +39,10 @@ A local HQ server that replaces the mock data source. You run `npx jsm-hq` insid
 ### How to build it
 
 **Phase A: server, setup checklist, and one real agent end to end**
-1. Server and `jsm-hq` command: Node + TypeScript, Hono + `ws`. It binds to 127.0.0.1:7420, creates a token on each start, and opens the browser with the token in the URL.
-2. `.jsmhq/config.json` (team, workflow; safe to commit) and `.jsmhq/plan.json`.
+1. Server and `hotrocket-hq` command: Node + TypeScript, Hono + `ws`. It binds to 127.0.0.1:7420, creates a token on each start, and opens the browser with the token in the URL.
+2. `.hrhq/config.json` (team, workflow; safe to commit) and `.hrhq/plan.json`.
 3. Setup checklist: OS support, `sbx` installed (`sbx version`), Docker sign-in, tmux, `gh auth status` and a GitHub remote, plus the "Run in terminal" helper.
-4. Workspace manager: clone into `~/.jsmhq/<project>/<agent>/`, write `ROLE.md`, the hooks and `.mcp.json`, and add the exclude entries.
+4. Workspace manager: clone into `~/.hrhq/<project>/<agent>/`, write `ROLE.md`, the hooks and `.mcp.json`, and add the exclude entries.
 5. Agent runner with two modes: Sandbox (`sbx run --name hq-<project>-<agent> claude <folder>` plus the HQ policy rule) and Local (`claude` in the same folder), both inside tmux.
 6. Terminal bridge: node-pty runs `tmux attach` and streams over WebSocket to xterm. Input goes back the same way.
 7. Hook endpoint: map Claude Code hook events to agent states (prompt or tool use = working, Notification = needs input, Stop = idle). Reject requests without the token.

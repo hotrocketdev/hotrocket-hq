@@ -6,7 +6,8 @@ import { run, shq } from "../lib/exec";
 import * as tmux from "./tmuxCli";
 import type { LaunchSpec, SessionBackend } from "./types";
 
-const TERM_ENV = { ...process.env, TERM: "xterm-256color", COLORTERM: "truecolor" } as Record<string, string>;
+// Read at spawn time, so a PATH fixed at startup (see lib/exec augmentPath) is included.
+const termEnv = (): Record<string, string> => ({ ...process.env, TERM: "xterm-256color", COLORTERM: "truecolor" });
 
 /** Quotes for a POSIX shell only when needed, so simple commands stay readable. */
 const q = (s: string) => (/^[A-Za-z0-9_\-.,:/=@%+]+$/.test(s) ? s : shq(s));
@@ -19,9 +20,9 @@ export const loadEnvFile = (quotedPath: string) =>
   // CRLF files: drop the \r. Lines whose key isn't a valid name are skipped (export would stop the shell).
   // Scratch names are unlikely to clash with app variables and are unset afterwards; the CR is
   // computed per line, so nothing in the file can change it.
-  `while IFS= read -r __jsmhq_l || [ -n "$__jsmhq_l" ]; do __jsmhq_l=\${__jsmhq_l%"$(printf '\\r')"}; __jsmhq_k=\${__jsmhq_l%%=*}; ` +
-  `case "$__jsmhq_l" in *=*) case "$__jsmhq_k" in ""|[!A-Za-z_]*|*[!A-Za-z0-9_]*) ;; *) export "$__jsmhq_l";; esac;; esac; done < ${quotedPath}; ` +
-  `unset __jsmhq_l __jsmhq_k`;
+  `while IFS= read -r __hrhq_l || [ -n "$__hrhq_l" ]; do __hrhq_l=\${__hrhq_l%"$(printf '\\r')"}; __hrhq_k=\${__hrhq_l%%=*}; ` +
+  `case "$__hrhq_l" in *=*) case "$__hrhq_k" in ""|[!A-Za-z_]*|*[!A-Za-z0-9_]*) ;; *) export "$__hrhq_l";; esac;; esac; done < ${quotedPath}; ` +
+  `unset __hrhq_l __hrhq_k`;
 
 /** The shell line tmux runs. Local mode loads the env file into that shell. */
 export function shellCommand(spec: LaunchSpec): string {
@@ -42,7 +43,7 @@ export const tmuxBackend: SessionBackend = {
   kill: (name) => tmux.killSession(name),
 
   attach(name, size, onData, onEnd) {
-    const pty = spawnPty("tmux", ["attach-session", "-t", `=${name}`], { name: "xterm-256color", cols: size.cols, rows: size.rows, env: TERM_ENV });
+    const pty = spawnPty("tmux", ["attach-session", "-t", `=${name}`], { name: "xterm-256color", cols: size.cols, rows: size.rows, env: termEnv() });
     pty.onData(onData);
     pty.onExit(onEnd);
     return { write: (d) => pty.write(d), resize: (c, r) => pty.resize(c, r), close: () => pty.kill() };
