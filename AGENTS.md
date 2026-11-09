@@ -47,6 +47,10 @@ npx tsx scripts/session-backend-test.ts && npx tsx scripts/workspace-test.ts
 pnpm build                                                      # typecheck + Vite + server bundle
 ```
 
+**If a fetch dies with `stdin is not a tty`**, that is the Windows git credential helper wanting a
+terminal, not the repo: the sync script disables prompts and retries once. If it still fails, run
+`gh auth status` and `git fetch origin` once by hand.
+
 ## Session start / end (vault handoffs)
 
 ```bash
