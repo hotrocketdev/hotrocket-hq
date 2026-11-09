@@ -38,24 +38,26 @@ export function TopBar() {
   const openPrs = snap.pullRequests.filter((p) => !p.merged && !p.closed).length;
 
   return (
-    <header className="panel no-scrollbar fixed left-4 right-4 top-[10px] z-10 flex h-[50px] items-center gap-2 overflow-x-auto px-3 xl:gap-4">
-      <div className="flex min-w-0 shrink items-center gap-2.5">
+    <header className="panel no-scrollbar fixed left-4 right-4 top-[10px] z-10 flex h-[50px] items-center gap-2 overflow-x-auto px-3 xl:gap-3">
+      <div className="flex shrink-0 items-center gap-2.5">
         <Logo />
-        {/* Truncates before it can run over the neighbours: "HotRocket HQ" is wider than the old name. */}
-        <b className="min-w-0 truncate text-[22px] font-bold tracking-[0.02em]">HotRocket HQ</b>
+        {/* The wordmark never shrinks: when the bar runs short the project name after it is what gives way. */}
+        <b className="whitespace-nowrap text-[22px] font-bold tracking-[0.02em]">HotRocket HQ</b>
         {!live && (
           <span className="chip shrink-0 text-[12px]" style={{ ["--c" as string]: "#ffec27" }} title="Running on mock data. Start the real HQ with `pnpm dev:hq`.">
             Demo data
           </span>
         )}
-        <span className="truncate text-[16px] text-muted">
-          — <em className="font-semibold not-italic text-ink">{snap.config.project.name}</em>{" "}
-          <span className="font-term text-[17px]">{snap.config.project.repo}</span>
-        </span>
       </div>
+      {/* The one item allowed to shrink, so a narrow window eats the repo path and not a control. */}
+      <span className="min-w-0 shrink truncate text-[16px] text-muted">
+        — <em className="font-semibold not-italic text-ink">{snap.config.project.name}</em>{" "}
+        <span className="font-term text-[17px]">{snap.config.project.repo}</span>
+      </span>
       <span className="hidden min-w-0 flex-1 sm:block" />
 
-      <label className="flex shrink-0 items-center gap-2 text-[14px]">
+      {/* Below this the bar can't hold the plan-wall picker and Debug; both stay reachable (Boards drawer, D). */}
+      <label className="hidden shrink-0 items-center gap-2 text-[14px] min-[1680px]:flex">
         <span className="hidden text-muted xl:inline">Plan wall</span>
         <select
           className="field w-[130px] py-0 text-[13px] xl:w-[190px] xl:text-[14px]"
@@ -133,7 +135,7 @@ export function TopBar() {
       <button className="btn shrink-0 text-[13px] xl:text-[14px]" onClick={() => ui.openSettings("team")}>
         Settings
       </button>
-      <button className="btn hidden shrink-0 text-[14px] xl:inline-block" aria-pressed={debugOpen} onClick={() => ui.toggleDebug()} title="Debug panel (D)">
+      <button className="btn hidden shrink-0 text-[14px] min-[1680px]:inline-block" aria-pressed={debugOpen} onClick={() => ui.toggleDebug()} title="Debug panel (D)">
         Debug
       </button>
     </header>
