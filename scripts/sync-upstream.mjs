@@ -81,9 +81,32 @@ if (!execFileSync("git", ["remote"], { encoding: "utf8", cwd }).split("\n").incl
 
 // ------------------------------------------------------------------ fetch
 
+// Fetching `origin` goes through the credential helper. On Windows that helper can try to open a
+// UI/wait on a terminal the first time in a session and die with "stdin is not a tty" — a confusing
+// message for what is really "the helper wasn't ready". Prompts are disabled and the fetch is retried
+// once, so a cold helper costs a retry instead of a failed run.
+const GIT_FETCH_ENV = { ...process.env, GIT_TERMINAL_PROMPT: "0", GCM_INTERACTIVE: "never" };
+
+function fetchRemote(remote, extra) {
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      execFileSync("git", ["fetch", remote, ...extra], { stdio: "inherit", cwd, env: GIT_FETCH_ENV });
+      return;
+    } catch {
+      if (attempt === 2) {
+        console.error(`\nCouldn't fetch ${remote} (tried twice, without prompts).`);
+        console.error("That is usually the git credential helper, not the repo: run `gh auth status`,");
+        console.error(`then \`git fetch ${remote}\` once by hand in a normal terminal.`);
+        process.exit(1);
+      }
+      console.error(`\nfetch ${remote} failed once, retrying without prompts…`);
+    }
+  }
+}
+
 step(`fetching ${UPSTREAM} and origin`);
-execFileSync("git", ["fetch", UPSTREAM, "--prune", "--tags"], { stdio: "inherit", cwd });
-execFileSync("git", ["fetch", "origin", "--prune"], { stdio: "inherit", cwd });
+fetchRemote(UPSTREAM, ["--prune", "--tags"]);
+fetchRemote("origin", ["--prune"]);
 
 const baseRef = "origin/main";
 const ahead = Number(execFileSync("git", ["rev-list", "--count", `${baseRef}..${UPSTREAM}/${BRANCH}`], { encoding: "utf8", cwd }).trim());
