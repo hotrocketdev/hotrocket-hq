@@ -9,31 +9,42 @@
 //   3. build and run the tests
 //   4. push the branch and open a PR you review
 //
-// If the merge conflicts, nothing is guessed: it aborts the merge and tells you
-// which files to resolve. Resolve them (upstream's code, our names), then run
-// this again — it will reuse the work.
+// It never touches your checkout: the work happens in a throwaway git worktree
+// cut from origin/main, so it can run while you (or another agent) have a
+// feature branch checked out here.
+//
+// If the merge conflicts, nothing is guessed: it aborts the merge, removes the
+// worktree and tells you which files to resolve. Resolve them by hand, then run
+// this again.
 //
 //   node scripts/sync-upstream.mjs             merge, rebrand, test, push, open a PR
-//   node scripts/sync-upstream.mjs --no-pr     stop after the commit
-//   node scripts/sync-upstream.mjs --no-push   stop after building
 //   node scripts/sync-upstream.mjs --check     only say whether upstream has news
-//   node scripts/sync-upstream.mjs --no-build  merge and rebrand without the build + tests
+//   node scripts/sync-upstream.mjs --no-build  skip install/build/tests (CI runs them on the PR)
+//   node scripts/sync-upstream.mjs --no-pr     stop after the commit; the branch stays
+//   node scripts/sync-upstream.mjs --no-push   stop after building
+//   node scripts/sync-upstream.mjs --in-place  work on the current checkout instead of a worktree
 
 import { execFileSync } from "node:child_process";
+import { existsSync, rmSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 
 const args = new Set(process.argv.slice(2));
 const checkOnly = args.has("--check");
 const noPr = args.has("--no-pr");
 const noPush = args.has("--no-push") || noPr;
-const noBuild = args.has("--no-build"); // for a quick merge-and-rebrand, without the 3-minute build
+const noBuild = args.has("--no-build");
+const inPlace = args.has("--in-place");
 
 const UPSTREAM = "upstream";
-const UPSTREAM_BRANCH = "main";
+const BRANCH = "main";
 
 const step = (msg) => console.log(`\n• ${msg}`);
 
+/** Repo commands run here: the worktree once it exists, the checkout before that. */
+let cwd = process.cwd();
+
 function git(...a) {
-  return execFileSync("git", a, { encoding: "utf8" }).trim();
+  return execFileSync("git", a, { encoding: "utf8", cwd }).trim();
 }
 
 function tryGit(...a) {
@@ -45,73 +56,107 @@ function tryGit(...a) {
 }
 
 function sh(cmd, a) {
-  execFileSync(cmd, a, { stdio: "inherit" });
+  execFileSync(cmd, a, { stdio: "inherit", cwd });
 }
+
+const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8", cwd }).trim();
 
 // ------------------------------------------------------------------ guards
 
-if (git("status", "--porcelain")) {
-  console.error("The tree has uncommitted changes. Commit or stash them first.");
-  process.exit(1);
-}
-
-const branch = git("rev-parse", "--abbrev-ref", "HEAD");
-if (branch !== "main") {
-  console.error(`Switch to main first (you're on ${branch}).`);
-  process.exit(1);
-}
-
-if (!git("remote").split("\n").includes(UPSTREAM)) {
+if (!execFileSync("git", ["remote"], { encoding: "utf8", cwd }).split("\n").includes(UPSTREAM)) {
   console.error(`No "${UPSTREAM}" remote. Add it: git remote add ${UPSTREAM} https://github.com/jsmastery-pro/jsm-hq.git`);
   process.exit(1);
 }
 
 // ------------------------------------------------------------------ fetch
 
-step(`fetching ${UPSTREAM}`);
-git("fetch", UPSTREAM, "--prune", "--tags");
+step(`fetching ${UPSTREAM} and origin`);
+execFileSync("git", ["fetch", UPSTREAM, "--prune", "--tags"], { stdio: "inherit", cwd });
+execFileSync("git", ["fetch", "origin", "--prune"], { stdio: "inherit", cwd });
 
-const ahead = Number(git("rev-list", "--count", `HEAD..${UPSTREAM}/${UPSTREAM_BRANCH}`));
+const base = "origin/main";
+const ahead = Number(execFileSync("git", ["rev-list", "--count", `${base}..${UPSTREAM}/${BRANCH}`], { encoding: "utf8", cwd }).trim());
 if (ahead === 0) {
   console.log("Up to date — upstream has nothing new.");
   process.exit(0);
 }
 
-// A sync PR opened elsewhere (the weekly workflow, or yesterday's run) is waiting for review.
-// Merging again would open a duplicate, so stop here and let a person decide.
+// A sync PR opened elsewhere (the weekly workflow, a cron run, yesterday's) is waiting for
+// review. Merging again would open a duplicate, so stop and let a person decide.
 const openSync = tryGit("gh", "pr", "list", "--state", "open", "--json", "number,title", "--jq", '[.[] | select(.title | startswith("Upstream sync")) | .number]');
-const openNumbers = openSync.ok ? openSync.out.trim() : "";
-if (openNumbers) {
-  console.log(`A sync PR is already open (#${openNumbers.replace(/\s+/g, ", #")}). Review or close it before running the sync again.`);
+if (openSync.ok && openSync.out.trim()) {
+  console.log(`A sync PR is already open (#${openSync.out.trim().replace(/\s+/g, ", #")}). Review or close it before syncing again.`);
   process.exit(0);
 }
 
-const incoming = git("log", "--oneline", "--no-decorate", `HEAD..${UPSTREAM}/${UPSTREAM_BRANCH}`).split("\n");
+const incoming = execFileSync("git", ["log", "--oneline", "--no-decorate", `${base}..${UPSTREAM}/${BRANCH}`], { encoding: "utf8", cwd })
+  .trim()
+  .split("\n");
 step(`${ahead} upstream commit(s) to bring in`);
 for (const line of incoming.slice(0, 20)) console.log(`  ${line}`);
 if (incoming.length > 20) console.log(`  … and ${incoming.length - 20} more`);
 
 if (checkOnly) process.exit(0);
 
+// ------------------------------------------------------------------ worktree
+
+const short = execFileSync("git", ["rev-parse", "--short", `${UPSTREAM}/${BRANCH}`], { encoding: "utf8", cwd }).trim();
+const syncBranch = `sync/upstream-${new Date().toISOString().slice(0, 10)}-${short}`;
+const worktree = join(dirname(root), `${basename(root)}-sync-${short}`);
+
+if (inPlace) {
+  if (git("status", "--porcelain")) {
+    console.error("--in-place with uncommitted changes. Commit or stash them first.");
+    process.exit(1);
+  }
+  const branch = git("rev-parse", "--abbrev-ref", "HEAD");
+  if (branch !== "main") {
+    console.error(`--in-place needs the main branch checked out (you're on ${branch}). Drop --in-place to use a worktree.`);
+    process.exit(1);
+  }
+  step(`merging into ${syncBranch} here`);
+  git("checkout", "-b", syncBranch);
+} else {
+  // Cut from origin/main, so whatever is checked out in the repo doesn't matter.
+  if (existsSync(worktree)) {
+    tryGit("worktree", "remove", "--force", worktree);
+    rmSync(worktree, { recursive: true, force: true });
+  }
+  step(`cutting a worktree from ${base} at ${worktree}`);
+  const added = tryGit("worktree", "add", "-b", syncBranch, worktree, base);
+  if (!added.ok) {
+    console.error(`Couldn't create the worktree:\n${added.out}`);
+    process.exit(1);
+  }
+  cwd = worktree;
+}
+
+function cleanup() {
+  if (inPlace) return;
+  tryGit("worktree", "remove", "--force", worktree);
+  if (existsSync(worktree)) rmSync(worktree, { recursive: true, force: true });
+  // The branch stays, so the work isn't lost.
+}
+
 // ------------------------------------------------------------------ merge
 
-const short = git("rev-parse", "--short", `${UPSTREAM}/${UPSTREAM_BRANCH}`);
-const syncBranch = `sync/upstream-${new Date().toISOString().slice(0, 10)}-${short}`;
-step(`merging into ${syncBranch}`);
-git("checkout", "-b", syncBranch);
-
-const merge = tryGit("merge", "--no-edit", `${UPSTREAM}/${UPSTREAM_BRANCH}`);
+step(`merging ${UPSTREAM}/${BRANCH}`);
+const merge = tryGit("merge", "--no-edit", `${UPSTREAM}/${BRANCH}`);
 if (!merge.ok) {
   const conflicts = tryGit("diff", "--name-only", "--diff-filter=U").out.split("\n").filter(Boolean);
   tryGit("merge", "--abort");
-  tryGit("checkout", "main");
+  cleanup();
   tryGit("branch", "-D", syncBranch);
   console.error("\nUpstream changed lines this fork also changed. Nothing was merged.");
   if (conflicts.length) {
     console.error("Resolve these by hand (keep upstream's logic, put our names back), then run this again:");
     for (const f of conflicts) console.error(`  ${f}`);
   }
-  console.error(`\nHints:\n  • a names-only conflict: take upstream's version, then \`node scripts/rebrand.mjs\`\n  • our own fixes (screenState.ts, augmentPath, TRUST_NOTE, readScreen) must survive: re-apply them on top of upstream's version`);
+  console.error(
+    "\nHints:\n  • a names-only conflict: take upstream's version, then `node scripts/rebrand.mjs`\n" +
+      "  • our own fixes must survive: server/screenState.ts, readScreen/TRUST_NOTE in server/sessions.ts,\n" +
+      "    augmentPath() in server/lib/exec.ts, the env-file load in server/backends/pty.ts",
+  );
   process.exit(2);
 }
 
@@ -121,31 +166,27 @@ step("rebranding what upstream brought in");
 const before = git("status", "--porcelain");
 sh("node", ["scripts/rebrand.mjs"]);
 const rebranded = git("status", "--porcelain") !== before;
-
 if (rebranded) git("add", "-A");
 
 // ------------------------------------------------------------------ build + tests
 
 if (noBuild) {
-  console.log("\n--no-build: skipping install, build and tests.");
+  console.log("\n--no-build: skipping install, build and tests (CI runs them on the PR).");
 } else {
   step("installing");
   sh("pnpm", ["install", "--frozen-lockfile"]);
-
   step("building");
   sh("pnpm", ["build"]);
-
   step("tests");
   sh("npx", ["tsx", "scripts/screen-state-test.ts"]);
+  sh("npx", ["tsx", "scripts/agent-env-test.ts"]);
   sh("npx", ["tsx", "scripts/session-backend-test.ts"]);
   sh("npx", ["tsx", "scripts/workspace-test.ts"]);
 }
 
 // ------------------------------------------------------------------ commit
 
-if (!rebranded) {
-  console.log("\nMerged with nothing to rebrand.");
-}
+if (!rebranded) console.log("\nMerged with nothing to rebrand.");
 
 const title = `Upstream sync: ${ahead} commit(s) from jsm-hq@${short}`;
 const body = [
@@ -155,21 +196,22 @@ const body = [
   "",
   rebranded ? "Rebranded by scripts/rebrand.mjs after the merge." : "No rebranding was needed.",
   "",
-  "Built and tested before pushing.",
+  noBuild ? "Local build skipped; CI builds and tests this PR." : "Built and tested before pushing.",
 ].join("\n");
 
 step("committing the sync branch");
 git("commit", "-q", "-m", title, "-m", body);
 
 if (noPush) {
-  console.log(`\nDone on ${syncBranch}. Review it, then push it when you're happy.`);
+  console.log(`\nCommitted on ${syncBranch}${inPlace ? "" : ` (worktree kept at ${worktree})`}. Review it, then push when you're happy.`);
   process.exit(0);
 }
 
 step("pushing");
 git("push", "-u", "origin", syncBranch);
+cleanup();
 
 if (noPr) process.exit(0);
 
 step("opening the PR");
-sh("gh", ["pr", "create", "--base", "main", "--head", syncBranch, "--title", title, "--body", body]);
+execFileSync("gh", ["pr", "create", "--base", "main", "--head", syncBranch, "--title", title, "--body", body], { stdio: "inherit", cwd: root });
