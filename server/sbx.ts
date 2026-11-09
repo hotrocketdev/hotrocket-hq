@@ -472,9 +472,10 @@ export class Sbx {
     if (!existsSync(file)) {
       writeFileSync(
         file,
-        `# App variables for ${this.hub.name(agentId)} (${this.hub.snap.config.project.name}).\n` +
-          "# One KEY=value per line. These values ENTER the agent's VM — use test/dev credentials.\n" +
-          "# Restart the agent after editing. HotRocket HQ never reads or commits this file.\n",
+        `# Credentials and app variables for ${this.hub.name(agentId)} (${this.hub.snap.config.project.name}).\n` +
+          "# One KEY=value per line. Leave it empty to use the CLI's own signed-in account.\n" +
+          "# Sandboxed agents get these in their VM: use test/dev keys for app variables.\n" +
+          "# Restart the agent after editing. HotRocket HQ never commits this file.\n",
         { mode: 0o600 },
       );
     }

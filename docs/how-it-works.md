@@ -105,12 +105,14 @@ Unticking a server takes effect when that agent's sandbox is recreated, because 
 
 **Supabase tip:** add `?project_ref=<id>` to the URL (Supabase → Project Settings → General) so the agent can only reach that project. Use a development project, not production.
 
-## App variables and keys
+## Accounts, API keys and app variables
 
-- **App variables** (Settings → Sandbox → App variables) become environment variables in the agent's session and its Shell tab. They're not a `.env` file in the project. Agents are told the names, never the values. Restart the agent after changing them.
+- **Your account (the default).** Agents use whatever the CLI is signed into: `claude` for a Claude subscription, `codex` for ChatGPT. Nothing to set up, and HQ never sees a token.
+- **Credentials** (Settings → Team → agent → Credentials) switch one agent to an API key, or to another provider behind the same CLI: Claude API, OpenAI API, Gemini API, or **DeepSeek** and OpenRouter through Claude Code's Anthropic-compatible endpoint. They live in that agent's env file (`~/.hrhq/<project>/<agent>.env`, mode 0600, outside the repo), are loaded into the agent's own process when it starts, and are never written to `.hrhq/config.json`. Restart the agent to apply; **Use the account instead** clears them.
+- **App variables** (Settings → Sandbox → App variables) are the same file, for what the project's code needs. They're environment variables, not a `.env` file in the repo. Agents are told the names, never the values.
 - **Service keys** (Settings → Sandbox) go to Docker Sandboxes' secret store. A sandbox's proxy adds the key to matching requests, so the key itself never enters the VM.
 
-HQ never stores key values and never reads your env files.
+HQ reads that one env file only to hand it to the agent's process, and never sends values to the browser — the settings panel shows the key names and what they amount to, not their contents.
 
 ## Settings you can change any time
 

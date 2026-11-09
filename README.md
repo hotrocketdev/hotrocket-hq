@@ -18,6 +18,7 @@ Agents run **Claude Code** or **Codex**. Everything runs on your machine.
 - **Safe by default.** Each agent works in its own Docker Sandbox, a small VM that can't touch the rest of your computer. Websites are blocked until you allow them.
 - **You stay in charge.** Anything an agent needs from you (a decision, an API key, a blocked website) shows up in **Action items**. HQ never merges for you.
 - **Your workflow.** Pull requests on GitHub, reviewed by CodeRabbit, Greptile, Copilot or you.
+- **Your account or your key.** Agents run on the subscription you're signed into (Claude, ChatGPT) — or point one agent at an API key or another provider, including DeepSeek, in Settings → Team → Credentials.
 - **Knows your stack.** Pick your tools (Next.js, Clerk, Stripe, Supabase…) and agents get their official agent skills and docs access.
 
 ## Quick start
@@ -64,7 +65,7 @@ Use it often? `npm install -g hotrocket-hq`, then run `hotrocket-hq` in any repo
 | GitHub CLI (`gh`) | Reads PRs and reviews |
 | Docker Sandboxes (`sbx`) | Each agent runs in its own VM |
 | tmux (macOS, Linux) | Agents keep running if you close HQ |
-| A Claude or ChatGPT account | For the agents themselves |
+| A Claude or ChatGPT account, or an API key | For the agents themselves. Signed-in CLIs are the default; API keys and other providers (DeepSeek, Gemini, OpenRouter) go in Settings → Team → Credentials. |
 
 Sandboxes need **macOS 14+ on Apple silicon, Windows 11, or Ubuntu 24.04+**. On other machines, set agents to **Local** in Settings → Team: they run Claude Code or Codex directly on your machine, with permission prompts on.
 

@@ -6,7 +6,7 @@ import { createMockSource } from "../data/mock/mockSource";
 import type { ConnectionStatus, DataPreset, OfficeDataSource, OfficeEvent, SimSpeed } from "../data/source";
 import { createWsSource } from "../data/ws/wsSource";
 import type { StackConfig } from "../data/stack";
-import type { AccessDecision, NewMcpServer, AgentConfig, AgentStatus, OfficeSnapshot, RemoveAgentOptions, SetupCheckId, WelcomeInput, WorkspaceInfo } from "../data/types";
+import type { AccessDecision, AgentCredentials, NewMcpServer, AgentConfig, AgentStatus, OfficeSnapshot, RemoveAgentOptions, SetupCheckId, WelcomeInput, WorkspaceInfo } from "../data/types";
 import { appendTerminal, clearTerminals } from "./terminal";
 
 export interface LoggedEvent {
@@ -24,6 +24,7 @@ interface OfficeState {
   presets: DataPreset[] | null;
   live: boolean; // connected to a real HQ server (vs. the demo mock)
   workspaceInfo: Record<string, WorkspaceInfo>; // answers to inspectWorkspace
+  credentials: Record<string, AgentCredentials>; // answers to inspectCredentials
   connection: ConnectionStatus;
   source: OfficeDataSource;
 }
@@ -64,6 +65,7 @@ export const useOffice = create<OfficeState>(() => ({
   presets: source.dev?.presets ?? null,
   live: token !== null,
   workspaceInfo: {},
+  credentials: {},
   connection: "connecting",
   source,
 }));
@@ -83,6 +85,8 @@ function reduce(snap: OfficeSnapshot, e: OfficeEvent): OfficeSnapshot {
     case "snapshot":
       return e.snapshot;
     case "workspace.info":
+      return snap;
+    case "credentials.info":
       return snap;
     case "sbx.updated":
       return { ...snap, sbx: e.sbx };
@@ -129,6 +133,10 @@ function handle(e: OfficeEvent) {
   }
   if (e.type === "workspace.info") {
     useOffice.setState((s) => ({ workspaceInfo: { ...s.workspaceInfo, [e.info.agentId]: e.info } }));
+    return;
+  }
+  if (e.type === "credentials.info") {
+    useOffice.setState((s) => ({ credentials: { ...s.credentials, [e.info.agentId]: e.info } }));
     return;
   }
   if (e.type === "snapshot") clearTerminals();
@@ -178,6 +186,8 @@ export const officeActions = {
   updateAgent: source.updateAgent.bind(source),
   removeAgent: (id: string, opts?: RemoveAgentOptions) => source.removeAgent(id, opts),
   inspectWorkspace: (id: string) => source.inspectWorkspace(id),
+  inspectCredentials: (id: string) => source.inspectCredentials(id),
+  setAgentEnv: (id: string, entries: Record<string, string | null>) => source.setAgentEnv(id, entries),
   updateSandbox: source.updateSandbox.bind(source),
   setSecret: (agentId: string | null, service: string, value: string) => source.setSecret(agentId, service, value),
   removeSecret: (agentId: string | null, service: string) => source.removeSecret(agentId, service),

@@ -6,6 +6,7 @@
 import { spawn as spawnPty, type IPty } from "@lydell/node-pty";
 import xtermHeadless from "@xterm/headless";
 import { run } from "../lib/exec";
+import { withEnvFile } from "../lib/envFile";
 import type { ExitInfo, SessionBackend, TermSize } from "./types";
 
 const { Terminal } = xtermHeadless;
@@ -48,9 +49,9 @@ export const ptyBackend: SessionBackend = {
 
   async create(name, cwd, spec, size) {
     if (procs.has(name)) return;
-    // There's no shell to load an env file into (sandbox mode passes it to sbx instead).
     const { file, args } = await resolveCommand(spec.file, spec.args);
-    const pty = spawnPty(file, args, { name: "xterm-256color", cols: size.cols, rows: size.rows, cwd, env: termEnv() });
+    // An env file (credentials, app variables) is read here since there is no shell to load it.
+    const pty = spawnPty(file, args, { name: "xterm-256color", cols: size.cols, rows: size.rows, cwd, env: withEnvFile(termEnv(), spec.envFile) });
     const screen = new Terminal({ cols: size.cols, rows: size.rows, scrollback: 300, allowProposedApi: true });
     const proc: Proc = { pty, screen, exit: { dead: false, exitStatus: null }, views: new Set(), ends: new Set() };
     pty.onData((d) => {

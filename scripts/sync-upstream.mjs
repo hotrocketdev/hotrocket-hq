@@ -77,6 +77,15 @@ if (ahead === 0) {
   process.exit(0);
 }
 
+// A sync PR opened elsewhere (the weekly workflow, or yesterday's run) is waiting for review.
+// Merging again would open a duplicate, so stop here and let a person decide.
+const openSync = tryGit("gh", "pr", "list", "--state", "open", "--json", "number,title", "--jq", '[.[] | select(.title | startswith("Upstream sync")) | .number]');
+const openNumbers = openSync.ok ? openSync.out.trim() : "";
+if (openNumbers) {
+  console.log(`A sync PR is already open (#${openNumbers.replace(/\s+/g, ", #")}). Review or close it before running the sync again.`);
+  process.exit(0);
+}
+
 const incoming = git("log", "--oneline", "--no-decorate", `HEAD..${UPSTREAM}/${UPSTREAM_BRANCH}`).split("\n");
 step(`${ahead} upstream commit(s) to bring in`);
 for (const line of incoming.slice(0, 20)) console.log(`  ${line}`);

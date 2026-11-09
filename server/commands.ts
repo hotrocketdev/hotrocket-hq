@@ -6,6 +6,8 @@ import { STACK_CATEGORIES, stackSkills, stackTool, type StackChoice, type StackC
 import { resolveAccess } from "./access";
 import { ensureSkillCache } from "./skills";
 import { run } from "./lib/exec";
+import { providerLabel, readEnvFile, writeEnvEntries } from "./lib/envFile";
+import { existsSync } from "node:fs";
 import { agentPalette } from "../src/theme/tokens";
 import { Hub } from "./hub";
 import type { Inbox } from "./inbox";
@@ -56,6 +58,17 @@ export function makeCommands(hub: Hub, sessions: Sessions, planner: Planner, inb
     }
   };
   const team = () => hub.snap.config.team;
+
+  /** Reads an agent's env file (names only) and tells the browser how it authed. */
+  const emitCredentials = (agentId: string) => {
+    if (!hub.cfg(agentId)) return;
+    const path = sbx.envFile(agentId);
+    const env = readEnvFile(path);
+    hub.emit({
+      type: "credentials.info",
+      info: { agentId, path, exists: existsSync(path), keys: Object.keys(env).sort(), provider: providerLabel(env) },
+    });
+  };
 
   const commands: Record<string, (...args: unknown[]) => unknown> = {
     sendTerminalInput: (id, data) => sessions.input(str(id, 80), str(data, 100_000)),
@@ -119,6 +132,32 @@ export function makeCommands(hub: Hub, sessions: Sessions, planner: Planner, inb
       hub.configChanged();
       // Codex agents add their own setup checks.
       if (`${agent.cli}/${agent.mode}` !== before) void sessions.recheckSetup();
+    },
+
+    // ---------------------------------------------------------- credentials
+    /** How this agent's CLI authenticates: its own account, or keys in its env file. */
+    inspectCredentials: (id) => emitCredentials(str(id, 80)),
+
+    setAgentEnv: (id, entries) => {
+      const agent = hub.cfg(str(id, 80));
+      if (!agent) return;
+      const clean: Record<string, string | null> = {};
+      for (const [key, value] of Object.entries((entries ?? {}) as Record<string, unknown>)) {
+        if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) continue;
+        // null removes the key; "" would export an empty value, which some CLIs treat as "set".
+        clean[key.slice(0, 80)] = value === null ? null : str(value, 4000);
+      }
+      const keys = Object.keys(clean);
+      if (!keys.length) return;
+      const file = sbx.ensureEnvFile(agent.id);
+      writeEnvEntries(file, clean);
+      const removed = keys.filter((k) => clean[k] === null);
+      hub.activity(
+        "config",
+        agent.id,
+        `${agent.name}: ${removed.length ? `cleared ${removed.join(", ")}` : `saved ${keys.join(", ")}`} in its env file. Restart the agent to apply.`,
+      );
+      emitCredentials(agent.id);
     },
 
     inspectWorkspace: async (id) => {

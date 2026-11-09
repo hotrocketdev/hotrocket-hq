@@ -7,6 +7,7 @@ import type {
   NewMcpServer,
   ActivityEvent,
   AgentMessage,
+  AgentCredentials,
   AgentPatch,
   AgentStatus,
   Board,
@@ -32,6 +33,7 @@ export type OfficeEvent =
   | { type: "setup.updated"; setup: SetupState }
   | { type: "sbx.updated"; sbx: SbxState }
   | { type: "workspace.info"; info: WorkspaceInfo }
+  | { type: "credentials.info"; info: AgentCredentials }
   | { type: "config.updated"; config: HqConfig }
   | { type: "agent.updated"; agent: AgentStatus }
   | { type: "agent.removed"; agentId: string }
@@ -102,6 +104,10 @@ export interface OfficeDataSource {
   removeAgent(id: string, opts?: RemoveAgentOptions): void;
   /** Asks what removing would delete; answered with a `workspace.info` event. */
   inspectWorkspace(id: string): void;
+  /** Asks how this agent's CLI authenticates; answered with a `credentials.info` event. */
+  inspectCredentials(id: string): void;
+  /** Sets (string) or clears (null) keys in the agent's env file. Restart the agent to apply. */
+  setAgentEnv(id: string, entries: Record<string, string | null>): void;
   updateSandbox(agentId: string, patch: Partial<SandboxSettings>): void;
   /** A service key for one agent's sandbox, or every sandbox (agentId null). The value goes to sbx via stdin; HQ never keeps it. */
   setSecret(agentId: string | null, service: string, value: string): void;

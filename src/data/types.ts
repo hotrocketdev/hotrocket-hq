@@ -227,6 +227,17 @@ export interface ActivityEvent {
   text: string;
 }
 
+/** How an agent's CLI is authenticated right now. Answer to `inspectCredentials`. */
+export interface AgentCredentials {
+  agentId: string;
+  /** The env file holding keys (HQ's home, 0600). Never the values themselves. */
+  path: string;
+  exists: boolean;
+  keys: string[]; // names only
+  /** What the keys amount to, e.g. "DeepSeek (via Claude Code)"; null = the CLI's own signed-in account. */
+  provider: string | null;
+}
+
 /** What removing an agent would delete. Answer to `inspectWorkspace`. */
 export interface WorkspaceInfo {
   agentId: string;

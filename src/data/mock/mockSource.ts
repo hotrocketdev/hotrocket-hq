@@ -256,6 +256,17 @@ export function createMockSource(): OfficeDataSource {
       });
     },
 
+    inspectCredentials(id) {
+      listener?.({
+        type: "credentials.info",
+        info: { agentId: id, path: `~/.hrhq/demo/${id}.env`, exists: false, keys: [], provider: null },
+      });
+    },
+
+    setAgentEnv() {
+      /* demo: nothing to save */
+    },
+
     removeAgent(id) {
       const agent = world.cfg(id);
       if (!agent || agent.isLead) return;

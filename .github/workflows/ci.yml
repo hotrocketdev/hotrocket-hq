@@ -28,6 +28,8 @@ jobs:
         run: npx tsx scripts/session-backend-test.ts
       - name: Screen state (busy, questions, trust prompts)
         run: npx tsx scripts/screen-state-test.ts
+      - name: Agent env file (credentials, app variables)
+        run: npx tsx scripts/agent-env-test.ts
       - name: Agent clones (line endings)
         run: npx tsx scripts/workspace-test.ts
       - name: Pack
