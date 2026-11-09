@@ -25,6 +25,7 @@ const SKIP_DIRS = new Set([".git", "node_modules", "dist", "dist-server", "pack"
 const SKIP_FILES = new Set([
   "README.md",
   "CONTRIBUTING.md", // ours: explains the fork and the merge rule, so it names both projects
+  "AGENTS.md", // ours: the same, for the agents that work in this repo
   "LICENSE",
   "TRADEMARKS.md",
   "scripts/rebrand.mjs",
