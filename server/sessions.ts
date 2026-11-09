@@ -104,8 +104,8 @@ export class Sessions {
       hub.setSession(id, { state: "starting", detail: "Preparing folder…", workspace: workspaceFor(agent, hub.slug) });
       const dir = await ensureWorkspace(agent, hub.slug, hub.repo);
       const adapter = adapters[agent.cli];
-      // App variables reach the agent in sandbox mode and in Local mode with tmux (not Local on Windows).
-      const hasEnvFile = !!this.envFileFor(id) && (agent.mode === "sandbox" || this.backend.persistent);
+      // The env file (credentials, app variables) reaches the agent in every mode.
+      const hasEnvFile = !!this.envFileFor(id);
       await adapter.writeFiles(dir, agent, hub.snap.config, this.agentToken, { hasEnvFile });
       const specs = stackSkills(hub.snap.config.stack);
       if (specs.length || hasHqSkills(hub.slug, dir)) {
@@ -116,10 +116,8 @@ export class Sessions {
       if (!(await this.backend.exists(name))) {
         const launch = adapter.launch(agent);
         const envFile = this.envFileFor(id);
-        // Local mode: the agent gets the env file's variables (tmux only: there's no shell to load them into otherwise).
+        // Local mode: the backend loads the env file's variables into the agent's own process.
         let spec: LaunchSpec = { file: localBinary[agent.cli], args: launch.args, envFile };
-        if (agent.mode === "local" && envFile && !this.backend.persistent)
-          hub.activity("session", id, `${agent.name}'s env file isn't loaded in Local mode on Windows. Use Sandbox mode for app variables.`);
         if (agent.mode === "sandbox") {
           hub.setSession(id, { detail: "Allowing the sandbox to reach HQ…" });
           await this.ensurePolicy();
