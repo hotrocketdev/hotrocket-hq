@@ -23,8 +23,14 @@ export interface RoleExtras {
 }
 
 /** HQ ≤ 0.3 wrote its role to ROLE.md; recognise that so it can be cleaned up. */
-const isHqRole = (text: string) =>
-  text.includes("## Team MCP (server `hq`)") && /You are managed by (HotRocket HQ|JSM HQ)\./.test(text); // a folder from an upstream JSM HQ run is recognised too
+const isHqRole = (text: string) => {
+  // A folder that the original (upstream) project set up is recognised too, so its role file is cleaned up.
+  const legacy = "You are managed by JSM HQ."; // rebrand-keep
+  return (
+    text.includes("## Team MCP (server `hq`)") &&
+    (text.includes("You are managed by HotRocket HQ.") || text.includes(legacy))
+  );
+};
 
 /**
  * The folder's own ROLE.md, if it has one (it's included in the generated role). A ROLE.md that an
