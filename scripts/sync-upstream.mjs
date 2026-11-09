@@ -18,7 +18,9 @@
 // this again.
 //
 //   node scripts/sync-upstream.mjs             merge, rebrand, test, push, open a PR
-//   node scripts/sync-upstream.mjs --check     only say whether upstream has news
+//   node scripts/sync-upstream.mjs --check     one line: is there anything new
+//   node scripts/sync-upstream.mjs --digest    read-only report: commits, files, and where a
+//                                              merge would clash. Changes nothing.
 //   node scripts/sync-upstream.mjs --no-build  skip install/build/tests (CI runs them on the PR)
 //   node scripts/sync-upstream.mjs --no-pr     stop after the commit; the branch stays
 //   node scripts/sync-upstream.mjs --no-push   stop after building
@@ -34,6 +36,7 @@ const noPr = args.has("--no-pr");
 const noPush = args.has("--no-push") || noPr;
 const noBuild = args.has("--no-build");
 const inPlace = args.has("--in-place");
+const digestOnly = args.has("--digest"); // read-only report: what is upstream, what would clash
 
 const UPSTREAM = "upstream";
 const BRANCH = "main";
@@ -82,8 +85,8 @@ step(`fetching ${UPSTREAM} and origin`);
 execFileSync("git", ["fetch", UPSTREAM, "--prune", "--tags"], { stdio: "inherit", cwd });
 execFileSync("git", ["fetch", "origin", "--prune"], { stdio: "inherit", cwd });
 
-const base = "origin/main";
-const ahead = Number(execFileSync("git", ["rev-list", "--count", `${base}..${UPSTREAM}/${BRANCH}`], { encoding: "utf8", cwd }).trim());
+const baseRef = "origin/main";
+const ahead = Number(execFileSync("git", ["rev-list", "--count", `${baseRef}..${UPSTREAM}/${BRANCH}`], { encoding: "utf8", cwd }).trim());
 if (ahead === 0) {
   console.log("Up to date — upstream has nothing new.");
   process.exit(0);
@@ -105,7 +108,7 @@ if (syncPrs.length) {
   process.exit(0);
 }
 
-const incoming = execFileSync("git", ["log", "--oneline", "--no-decorate", `${base}..${UPSTREAM}/${BRANCH}`], { encoding: "utf8", cwd })
+const incoming = execFileSync("git", ["log", "--oneline", "--no-decorate", `${baseRef}..${UPSTREAM}/${BRANCH}`], { encoding: "utf8", cwd })
   .trim()
   .split("\n");
 step(`${ahead} upstream commit(s) to bring in`);
@@ -113,6 +116,47 @@ for (const line of incoming.slice(0, 20)) console.log(`  ${line}`);
 if (incoming.length > 20) console.log(`  … and ${incoming.length - 20} more`);
 
 if (checkOnly) process.exit(0);
+
+// ------------------------------------------------------------------ digest (read-only)
+
+if (digestOnly) {
+  const base = execFileSync("git", ["merge-base", baseRef, `${UPSTREAM}/${BRANCH}`], { encoding: "utf8", cwd }).trim();
+  const rows = execFileSync("git", ["log", "--format=%h%x09%ad%x09%an%x09%s", "--date=short", `${baseRef}..${UPSTREAM}/${BRANCH}`], { encoding: "utf8", cwd })
+    .trim()
+    .split("\n")
+    .filter(Boolean)
+    .map((l) => l.split("\t"));
+
+  const filesUp = execFileSync("git", ["diff", "--name-only", `${baseRef}..${UPSTREAM}/${BRANCH}`], { encoding: "utf8", cwd }).trim().split("\n").filter(Boolean);
+  const filesOurs = execFileSync("git", ["diff", "--name-only", `${base}..${baseRef}`], { encoding: "utf8", cwd }).trim().split("\n").filter(Boolean);
+  const stat = execFileSync("git", ["diff", "--shortstat", `${baseRef}..${UPSTREAM}/${BRANCH}`], { encoding: "utf8", cwd }).trim();
+
+  const protectedFiles = ["server/sessions.ts", "server/screenState.ts", "server/lib/exec.ts", "server/backends/pty.ts", "server/adapters.ts", "src/ui/settings/CredentialsSection.tsx", "src/ui/hud/TopBar.tsx"];
+  const touchesOurs = filesUp.filter((f) => protectedFiles.includes(f));
+
+  console.log(`## ${ahead} commit(s) in ${UPSTREAM}/${BRANCH} that ${baseRef} does not have\n`);
+  console.log("| commit | date | author | subject |");
+  console.log("| --- | --- | --- | --- |");
+  for (const [sha, date, author, subject] of rows) console.log(`| ${sha} | ${date} | ${author.replace(/\|/g, "/")} | ${subject.replace(/\|/g, "/")} |`);
+  console.log(`\nUpstream touches ${filesUp.length} file(s) — ${stat || "no diffstat"}`);
+
+  // Grouped rather than listed: 62 paths tell a reader less than six areas do.
+  const areas = new Map();
+  for (const f of filesUp) {
+    const area = f.includes("/") ? f.split("/").slice(0, f.startsWith("src/") || f.startsWith("server/") ? 2 : 1).join("/") : "(root files)";
+    areas.set(area, (areas.get(area) ?? 0) + 1);
+  }
+  const big = [...areas.entries()].filter(([, n]) => n > 1).sort((a, b) => b[1] - a[1]);
+  const small = [...areas.entries()].filter(([, n]) => n === 1).length;
+  console.log("\nWhere: " + big.map(([a, n]) => `${a} (${n})`).join(", ") + (small ? `${big.length ? ", " : ""}${small} single file(s) elsewhere` : ""));
+
+  if (touchesOurs.length) {
+    console.log(`\n**Careful: upstream touches code this fork patched — read those diffs, our behaviour must survive:**`);
+    for (const f of touchesOurs) console.log(`- ${f}`);
+  }
+  process.exit(0);
+}
+
 
 // ------------------------------------------------------------------ worktree
 
@@ -143,8 +187,8 @@ if (inPlace) {
   if (tryGit("rev-parse", "--verify", "--quiet", `refs/heads/${syncBranch}`).ok) {
     tryGit("branch", "-D", syncBranch);
   }
-  step(`cutting a worktree from ${base} at ${worktree}`);
-  const added = tryGit("worktree", "add", "-b", syncBranch, worktree, base);
+  step(`cutting a worktree from ${baseRef} at ${worktree}`);
+  const added = tryGit("worktree", "add", "-b", syncBranch, worktree, baseRef);
   if (!added.ok) {
     console.error(`Couldn't create the worktree:\n${added.out}`);
     process.exit(1);
@@ -192,7 +236,7 @@ if (rebranded) git("add", "-A");
 // A sync PR merged with "squash" leaves upstream's commits out of main's history, so the count
 // above keeps naming them for ever. Ask the real question instead: after merging and renaming,
 // does this branch say anything main doesn't? If not, there is nothing to sync.
-if (!git("status", "--porcelain") && tryGit("diff", "--quiet", base, "--", ".").ok) {
+if (!git("status", "--porcelain") && tryGit("diff", "--quiet", baseRef, "--", ".").ok) {
   console.log("\nUpstream has been merged already (its history was squashed): nothing new to bring in.");
   cleanup();
   process.exit(0);
