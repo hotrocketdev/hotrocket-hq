@@ -55,6 +55,14 @@ function tryGit(...a) {
   }
 }
 
+function tryGh(...a) {
+  try {
+    return { ok: true, out: execFileSync("gh", a, { encoding: "utf8", cwd: root }).trim() };
+  } catch (e) {
+    return { ok: false, out: `${e.stdout ?? ""}${e.stderr ?? ""}` };
+  }
+}
+
 function sh(cmd, a) {
   execFileSync(cmd, a, { stdio: "inherit", cwd });
 }
@@ -83,9 +91,17 @@ if (ahead === 0) {
 
 // A sync PR opened elsewhere (the weekly workflow, a cron run, yesterday's) is waiting for
 // review. Merging again would open a duplicate, so stop and let a person decide.
-const openSync = tryGit("gh", "pr", "list", "--state", "open", "--json", "number,title", "--jq", '[.[] | select(.title | startswith("Upstream sync")) | .number]');
-if (openSync.ok && openSync.out.trim()) {
-  console.log(`A sync PR is already open (#${openSync.out.trim().replace(/\s+/g, ", #")}). Review or close it before syncing again.`);
+const openSync = tryGh("pr", "list", "--state", "open", "--json", "number,title");
+let syncPrs = [];
+if (openSync.ok) {
+  try {
+    syncPrs = JSON.parse(openSync.out || "[]").filter((p) => typeof p?.title === "string" && p.title.startsWith("Upstream sync"));
+  } catch {
+    // gh printed something that isn't JSON (not signed in, network): carry on and let the push fail loudly.
+  }
+}
+if (syncPrs.length) {
+  console.log(`A sync PR is already open (#${syncPrs.map((p) => p.number).join(", #")}). Review or close it before syncing again.`);
   process.exit(0);
 }
 
@@ -121,6 +137,11 @@ if (inPlace) {
   if (existsSync(worktree)) {
     tryGit("worktree", "remove", "--force", worktree);
     rmSync(worktree, { recursive: true, force: true });
+  }
+  // A failed run leaves the branch behind; the next attempt for the same upstream commit
+  // must be able to reuse that name instead of dying on "branch already exists".
+  if (tryGit("rev-parse", "--verify", "--quiet", `refs/heads/${syncBranch}`).ok) {
+    tryGit("branch", "-D", syncBranch);
   }
   step(`cutting a worktree from ${base} at ${worktree}`);
   const added = tryGit("worktree", "add", "-b", syncBranch, worktree, base);
