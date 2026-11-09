@@ -78,6 +78,15 @@ rule:
 `README.md`, `LICENSE`, `TRADEMARKS.md`, the sync scripts — are skipped, and any line can opt out
 with a `rebrand-keep` comment.
 
+**Merge a sync PR with a merge commit, never a squash.** Squashing rewrites the merge into one new
+commit, so upstream's commits never enter our history: `git rev-list origin/main..upstream/main`
+keeps naming them and the next sync re-attempts the same merge, conflicts and all. If that has
+already happened, record the ancestry without touching the tree:
+
+```bash
+git merge -s ours upstream/main -m "Record upstream as merged"
+```
+
 `.github/workflows/sync-upstream.yml` does the same every Monday and opens the PR for you, or an
 issue when a merge needs a person.
 

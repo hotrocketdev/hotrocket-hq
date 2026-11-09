@@ -189,6 +189,15 @@ sh("node", ["scripts/rebrand.mjs"]);
 const rebranded = git("status", "--porcelain") !== before;
 if (rebranded) git("add", "-A");
 
+// A sync PR merged with "squash" leaves upstream's commits out of main's history, so the count
+// above keeps naming them for ever. Ask the real question instead: after merging and renaming,
+// does this branch say anything main doesn't? If not, there is nothing to sync.
+if (!git("status", "--porcelain") && tryGit("diff", "--quiet", base, "--", ".").ok) {
+  console.log("\nUpstream has been merged already (its history was squashed): nothing new to bring in.");
+  cleanup();
+  process.exit(0);
+}
+
 // ------------------------------------------------------------------ build + tests
 
 if (noBuild) {
@@ -218,6 +227,9 @@ const body = [
   rebranded ? "Rebranded by scripts/rebrand.mjs after the merge." : "No rebranding was needed.",
   "",
   noBuild ? "Local build skipped; CI builds and tests this PR." : "Built and tested before pushing.",
+  "",
+  "**Merge this PR with a merge commit, not a squash.** Squashing drops upstream's commits out of",
+  "the history, and the next sync re-attempts the same merge (recover with `git merge -s ours upstream/main`).",
 ].join("\n");
 
 step("committing the sync branch");
