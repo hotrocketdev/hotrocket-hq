@@ -24,6 +24,7 @@ const SKIP_DIRS = new Set([".git", "node_modules", "dist", "dist-server", "pack"
 /** Files that deliberately mention the old names, or carry the mapping itself. */
 const SKIP_FILES = new Set([
   "README.md",
+  "CONTRIBUTING.md", // ours: explains the fork and the merge rule, so it names both projects
   "LICENSE",
   "TRADEMARKS.md",
   "scripts/rebrand.mjs",
