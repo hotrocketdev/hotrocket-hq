@@ -42,6 +42,45 @@ context/     Implementation plans
 
 HQ calls the `sbx` CLI and reads its output. sbx 0.48 changed several outputs (for example `sbx ls --json` and `sbx mcp ls --json` now return a bare array), so read sbx output in a way that accepts both the old and the new format. HQ is tested on sbx 0.47, 0.50 and 0.51.
 
+## Updating from upstream
+
+HotRocket HQ is a fork of [JSM HQ](https://github.com/jsmastery-pro/jsm-hq). The fork is renamed, so
+upstream's commits arrive with our names and the old ones in the same files: the merge itself is
+normal git, and the renaming is scripted instead of done by hand.
+
+Add the upstream remote once:
+
+```bash
+git remote add upstream https://github.com/jsmastery-pro/jsm-hq.git
+```
+
+Then, from a clean `main`:
+
+```bash
+node scripts/sync-upstream.mjs --check   # is there anything new?
+node scripts/sync-upstream.mjs           # merge, rebrand, build, test, push, open a PR
+```
+
+It merges `upstream/main` on a `sync/upstream-<date>-<sha>` branch, runs `scripts/rebrand.mjs`,
+builds, runs the tests and opens a PR. Review the PR like any other: nothing is merged for you.
+
+**When it conflicts**, it aborts rather than guessing, and lists the files. Resolve them with this
+rule:
+
+- take **upstream's logic** — it is usually a fix or a feature;
+- put **our names** back — `node scripts/rebrand.mjs` does that for you once the merge is resolved;
+- keep **our own changes** that live in the same files: the screen reader (`server/screenState.ts`,
+  `readScreen` in `server/sessions.ts`, the trust note), `augmentPath()` in `server/lib/exec.ts`.
+  If upstream rewrote one of those, re-apply it on top of their version.
+
+`scripts/rebrand.mjs` is the single source of truth for the name mapping, and it is idempotent
+(`--check` exits 1 when something is left to rename). Files that mention JSM HQ on purpose — our
+`README.md`, `LICENSE`, `TRADEMARKS.md`, the sync scripts — are skipped, and any line can opt out
+with a `rebrand-keep` comment.
+
+`.github/workflows/sync-upstream.yml` does the same every Monday and opens the PR for you, or an
+issue when a merge needs a person.
+
 ## Releasing
 
 1. Bump `version` in `package.json` and merge to `main`.

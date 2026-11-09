@@ -1,0 +1,76 @@
+name: Sync from upstream
+
+# JSM HQ (the project this is forked from) releases often. This opens a PR with
+# its new commits, already rebranded, built and tested — so keeping up is a review,
+# not a merge. Nothing is merged for you.
+#
+# If the merge conflicts (both sides changed the same lines), the run fails and
+# opens an issue naming the files to resolve by hand.
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays, 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: upstream-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Point at the project this is forked from
+        run: |
+          git config user.name "hotrocket-hq sync"
+          git config user.email "noreply@hotrocket.dev"
+          git remote add upstream https://github.com/jsmastery-pro/jsm-hq.git
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Merge, rebrand, build, test, open a PR
+        id: sync
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/sync-upstream.mjs
+
+      - name: Report a merge that needs a person
+        if: steps.sync.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          files=$(git diff --name-only --diff-filter=U 2>/dev/null | tr '\n' ' ')
+          gh issue create \
+            --title "Upstream sync needs a manual merge" \
+            --body "The weekly sync could not merge cleanly${files:+ (conflicting files: $files)}.
+
+          Run it locally:
+          \`\`\`bash
+          git checkout main && git pull
+          node scripts/sync-upstream.mjs --no-push
+          \`\`\`
+          Resolve the conflicts (keep upstream's logic, put our names back), then:
+          \`\`\`bash
+          node scripts/rebrand.mjs
+          git add -A && git commit
+          \`\`\`
+          The run log has the details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
