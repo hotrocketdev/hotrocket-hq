@@ -38,10 +38,11 @@ export function TopBar() {
   const openPrs = snap.pullRequests.filter((p) => !p.merged && !p.closed).length;
 
   return (
-    <header className="panel fixed left-4 right-4 top-[10px] z-10 flex h-[50px] items-center gap-4 px-3">
-      <div className="flex min-w-0 items-center gap-2.5">
+    <header className="panel no-scrollbar fixed left-4 right-4 top-[10px] z-10 flex h-[50px] items-center gap-2 overflow-x-auto px-3 xl:gap-4">
+      <div className="flex min-w-0 shrink items-center gap-2.5">
         <Logo />
-        <b className="whitespace-nowrap text-[22px] font-bold tracking-[0.02em]">HotRocket HQ</b>
+        {/* Truncates before it can run over the neighbours: "HotRocket HQ" is wider than the old name. */}
+        <b className="min-w-0 truncate text-[22px] font-bold tracking-[0.02em]">HotRocket HQ</b>
         {!live && (
           <span className="chip shrink-0 text-[12px]" style={{ ["--c" as string]: "#ffec27" }} title="Running on mock data. Start the real HQ with `pnpm dev:hq`.">
             Demo data
@@ -52,12 +53,12 @@ export function TopBar() {
           <span className="font-term text-[17px]">{snap.config.project.repo}</span>
         </span>
       </div>
-      <div className="flex-1" />
+      <span className="hidden min-w-0 flex-1 sm:block" />
 
-      <label className="flex items-center gap-2 text-[14px]">
-        <span className="text-muted">Plan wall</span>
+      <label className="flex shrink-0 items-center gap-2 text-[14px]">
+        <span className="hidden text-muted xl:inline">Plan wall</span>
         <select
-          className="field w-[190px] py-0 text-[14px]"
+          className="field w-[130px] py-0 text-[13px] xl:w-[190px] xl:text-[14px]"
           value={planBoardId ?? ""}
           onChange={(e) => ui.showBoardOnWall(e.target.value || null)}
           aria-label="Board shown on the plan wall"
@@ -81,7 +82,7 @@ export function TopBar() {
         </div>
       )}
 
-      <div className="flex gap-1.5">
+      <div className="flex shrink-0 gap-1.5">
         <button className="btn w-8 px-0 text-[18px] leading-none" aria-label="Zoom out" onClick={() => ui.zoom(-1)}>
           −
         </button>
@@ -91,7 +92,7 @@ export function TopBar() {
       </div>
 
       <div
-        className="flex items-center gap-2 whitespace-nowrap border-[3px] border-ink bg-navy px-2.5 py-0.5 text-[15px] text-cream"
+        className="flex shrink-0 items-center gap-2 whitespace-nowrap border-[3px] border-ink bg-navy px-2.5 py-0.5 text-[15px] text-cream"
         title="Each agent runs in its own isolated Docker Sandbox (microVM)"
       >
         <span>
@@ -101,38 +102,38 @@ export function TopBar() {
       </div>
 
       {live && stopped.length > 0 && (
-        <button className="btn text-[14px]" onClick={() => stopped.forEach((a) => officeActions.startAgent(a.agentId))}>
+        <button className="btn shrink-0 text-[13px] xl:text-[14px]" onClick={() => stopped.forEach((a) => officeActions.startAgent(a.agentId))}>
           Start {stopped.length === snap.agents.length ? "team" : `${stopped.length} stopped`}
         </button>
       )}
       {live && (
-        <button className="btn text-[14px]" onClick={() => ui.openSetup()} title="Setup checklist">
+        <button className="btn shrink-0 text-[13px] xl:text-[14px]" onClick={() => ui.openSetup()} title="Setup checklist">
           Setup{setupIssues ? ` · ${setupIssues}` : " ✓"}
         </button>
       )}
-      <div className="flex gap-1.5">
+      <div className="flex shrink-0 gap-1.5">
         <button
-          className="btn text-[14px]"
+          className="btn shrink-0 text-[13px] xl:text-[14px]"
           style={attention ? { background: "#ffec27" } : undefined}
           onClick={() => ui.openActions()}
           title="Everything waiting on you"
         >
           Action items{attention ? ` · ${attention}` : ""}
         </button>
-        <button className="btn text-[14px]" onClick={() => ui.openBoards(planBoardId ?? undefined)}>
+        <button className="btn shrink-0 text-[13px] xl:text-[14px]" onClick={() => ui.openBoards(planBoardId ?? undefined)}>
           Boards
         </button>
-        <button className="btn text-[14px]" onClick={() => ui.openPrs()}>
+        <button className="btn shrink-0 text-[13px] xl:text-[14px]" onClick={() => ui.openPrs()}>
           PRs{openPrs ? ` · ${openPrs}` : ""}
         </button>
-        <button className="btn text-[14px]" onClick={() => ui.openTerminal()} title="Your own shell on this machine: the repo, an agent's folder or any folder">
+        <button className="btn shrink-0 text-[13px] xl:text-[14px]" onClick={() => ui.openTerminal()} title="Your own shell on this machine: the repo, an agent's folder or any folder">
           Terminal
         </button>
       </div>
-      <button className="btn text-[14px]" onClick={() => ui.openSettings("team")}>
+      <button className="btn shrink-0 text-[13px] xl:text-[14px]" onClick={() => ui.openSettings("team")}>
         Settings
       </button>
-      <button className="btn text-[14px]" aria-pressed={debugOpen} onClick={() => ui.toggleDebug()} title="Debug panel (D)">
+      <button className="btn hidden shrink-0 text-[14px] xl:inline-block" aria-pressed={debugOpen} onClick={() => ui.toggleDebug()} title="Debug panel (D)">
         Debug
       </button>
     </header>

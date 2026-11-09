@@ -69,6 +69,14 @@ html[data-font] .font-term {
 }
 
 @layer components {
+  /* Scrolls without showing a scrollbar: the top bar when the window is narrow. */
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
   /* Chunky game panel: ink outline, light bevel, hard drop shadow (no blur) */
   .panel {
     background: var(--color-cream);
