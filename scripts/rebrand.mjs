@@ -46,7 +46,6 @@ const REPLACEMENTS = [
 /** Upstream file paths that must be renamed if a merge brings them back. */
 const FILE_RENAMES = [
   ["bin/jsm-hq.mjs", "bin/hotrocket-hq.mjs"],
-  ["docs/jsmhq-context.md", "docs/product-spec.md"],
 ];
 
 const TEXT_EXT = /\.(ts|tsx|mjs|js|css|html|json|md|yml|yaml|txt)$/;
